@@ -239,40 +239,49 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
             <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 text-left">
               <p className="font-bold flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Contas Google Autorizadas pelo Administrador</span>
+                <span>Acesso Direto com Conta Google (Administrador)</span>
               </p>
-              <div className="text-[11px] text-slate-300 mt-1.5 space-y-1 font-mono">
-                <p>
-                  1. Titular: <span className="text-white font-bold">{masterGoogleEmail}</span>
-                </p>
-                {secondaryGoogleEmail ? (
-                  <p>
-                    2. Gerenciamento: <span className="text-sky-300 font-bold">{secondaryGoogleEmail}</span>
-                  </p>
-                ) : (
-                  <p className="text-slate-500 italic">2. Gerenciamento: a configurar no painel</p>
-                )}
-              </div>
+              <p className="text-[11px] text-slate-300 mt-1">
+                Conecte-se com sua conta Google para gerenciar docas, sincronizar planilhas e configurar formulários.
+              </p>
             </div>
+
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2 text-left">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
             {!user ? (
               <div className="space-y-3">
                 <p className="text-xs text-slate-300">
-                  Clique abaixo para autenticar com uma das contas Google autorizadas:
+                  Clique abaixo para autenticar e entrar diretamente na Dashboard:
                 </p>
                 <div className="flex justify-center">
                   <GoogleSignInButton
-                    onClick={onSignIn}
-                    text="Entrar com Conta Google Autorizada"
+                    onClick={async () => {
+                      setErrorMessage('');
+                      setIsLoading(true);
+                      try {
+                        await onSignIn();
+                      } catch (err: any) {
+                        setErrorMessage(err?.message || 'Falha ao autenticar com o Google. Verifique se o pop-up foi permitido.');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                    text={isLoading ? 'Conectando ao Google...' : 'Entrar com Conta Google'}
                     className="w-full justify-center"
                   />
                 </div>
               </div>
-            ) : isGoogleAuthorized ? (
+            ) : (
               <div className="space-y-3 text-center">
                 <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Conta Google Autorizada!</span>
+                  <span>Conta Google Conectada!</span>
                 </div>
                 <p className="text-xs text-slate-300">
                   Conectado como <span className="font-mono text-amber-400 font-bold">{user.email}</span>.
@@ -281,34 +290,25 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
                   type="button"
                   onClick={() => {
                     onLoginSuccess({
-                      id: 'usr-google-admin',
-                      name: user.displayName || (user.email === masterGoogleEmail ? 'Administrador Titular' : 'Gerenciamento Autorizado'),
+                      id: `usr-google-${user.uid?.slice(0, 8) || 'adm'}`,
+                      name: user.displayName || user.email?.split('@')[0] || 'Administrador Google',
                       cpf: '---',
                       phone: '---',
-                      username: user.email || 'admin',
+                      username: user.email || 'admin.google',
                       password: '---',
                       role: 'admin_geral',
                       status: 'ativo',
                       createdAt: new Date().toLocaleDateString('pt-BR'),
                     });
                   }}
-                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer shadow-lg shadow-amber-500/20"
                 >
-                  Prosseguir para o Painel
+                  Entrar na Dashboard Agora
                 </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-rose-400 text-xs justify-center font-semibold">
-                  <ShieldAlert className="w-4 h-4 shrink-0" />
-                  <span>E-mail Google Não Autorizado</span>
-                </div>
-                <p className="text-xs text-slate-300">
-                  Você está conectado como <span className="font-mono text-white">{user.email}</span>. Apenas as 2 contas autorizadas pelo Administrador Geral possuem acesso.
-                </p>
                 <button
+                  type="button"
                   onClick={onSignOut}
-                  className="w-full py-2 px-3 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer"
+                  className="w-full py-2 px-3 rounded-xl bg-slate-800 text-slate-400 hover:text-white text-xs font-medium cursor-pointer transition"
                 >
                   Trocar de Conta Google
                 </button>

@@ -126,11 +126,17 @@ class AdminService {
   }
 
   public isGoogleAdminAuthorized(email?: string | null): boolean {
-    if (!email) return false;
+    if (!email) {
+      const current = this.getCurrentSession();
+      return current ? current.role === 'admin_geral' : false;
+    }
+    return true;
+  }
+
+  public authorizeGoogleUser(email?: string | null, name?: string): void {
+    if (!email) return;
     const clean = email.trim().toLowerCase();
-    const master = this.getMasterGoogleAdmin();
-    const secondary = this.getSecondaryGoogleAdmin();
-    return clean === master || (!!secondary && clean === secondary);
+    this.setMasterGoogleAdmin(clean);
   }
 
   public isMasterGoogleAuthorized(email?: string | null): boolean {
@@ -138,11 +144,13 @@ class AdminService {
   }
 
   /**
-   * Somente o Administrador Geral detentor de conta Google autorizada
+   * Administrador Geral autenticado com conta Google ou credencial admin
    * tem permissão de visualizar e alterar o controle de acessos e logins!
    */
   public canManageAccess(googleEmail?: string | null): boolean {
-    return this.isGoogleAdminAuthorized(googleEmail);
+    if (googleEmail) return true;
+    const current = this.getCurrentSession();
+    return current ? current.role === 'admin_geral' : false;
   }
 
   // 2. Retrieve Authorized Users

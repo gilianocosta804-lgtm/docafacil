@@ -26,7 +26,14 @@ import {
   Sparkles,
   LayoutDashboard,
   Lock,
-  UserCheck
+  UserCheck,
+  FileText,
+  ClipboardList,
+  Send,
+  Compass,
+  Phone,
+  QrCode,
+  Copy
 } from 'lucide-react';
 import { DriverEntry, Dock, CallAlertEvent, AuthorizedUser } from '../types';
 import { audioService } from '../services/audioService';
@@ -44,6 +51,19 @@ interface DriverMobileViewProps {
   formUrl?: string;
   isSyncing?: boolean;
   onTriggerSync?: () => void;
+  onRegisterDriver?: (driver: {
+    nome: string;
+    rota: string;
+    cidade?: string;
+    rotaPrioridade?: boolean;
+    horarioChegada: string;
+    localizacao: string;
+    latitude?: number;
+    longitude?: number;
+    mapsUrl?: string;
+    placa: string;
+    telefone: string;
+  }) => Promise<void> | void;
 }
 
 export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
@@ -57,6 +77,7 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
   formUrl,
   isSyncing = false,
   onTriggerSync,
+  onRegisterDriver,
 }) => {
   // Saved driver identification
   const [selectedDriverId, setSelectedDriverId] = useState<string>(() => {
@@ -73,7 +94,116 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
   );
   const notifiedCallIdsRef = React.useRef<Set<string>>(new Set());
 
-  const [activeTab, setActiveTab] = useState<'meu-carro' | 'fila' | 'docas'>('meu-carro');
+  const [activeTab, setActiveTab] = useState<'meu-carro' | 'fila' | 'docas' | 'forms'>('meu-carro');
+
+  // Forms and Check-in state
+  const [formNome, setFormNome] = useState('');
+  const [formPlaca, setFormPlaca] = useState('');
+  const [formRota, setFormRota] = useState('');
+  const [formTelefone, setFormTelefone] = useState('');
+  const [formCidade, setFormCidade] = useState('Gama / Entorno DF');
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formSuccessNotice, setFormSuccessNotice] = useState<string | null>(null);
+  const [showQrForms, setShowQrForms] = useState(false);
+  const [copiedFormLink, setCopiedFormLink] = useState(false);
+
+  // GPS validation for Condomínio SYS do Gama, Ponte Alta
+  const BASE_LAT = -16.0492;
+  const BASE_LNG = -48.0483;
+  const BASE_NAME = 'Condomínio SYS do Gama, Ponte Alta (Gama - DF)';
+  const MAX_RADIUS_METERS = 150;
+  const [driverLat, setDriverLat] = useState<number | null>(null);
+  const [driverLng, setDriverLng] = useState<number | null>(null);
+  const [distanceMeters, setDistanceMeters] = useState<number | null>(null);
+  const [isWithinGeofence, setIsWithinGeofence] = useState<boolean>(true);
+  const [isGpsLoading, setIsGpsLoading] = useState<boolean>(false);
+  const [simulationMode, setSimulationMode] = useState<boolean>(false);
+
+  // Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c);
+  };
+
+  const detectGps = () => {
+    if (!navigator.geolocation) return;
+    setIsGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setDriverLat(latitude);
+        setDriverLng(longitude);
+        const dist = calculateDistance(latitude, longitude, BASE_LAT, BASE_LNG);
+        setDistanceMeters(dist);
+        setIsWithinGeofence(dist <= MAX_RADIUS_METERS);
+        setIsGpsLoading(false);
+      },
+      () => {
+        setIsGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  useEffect(() => {
+    if (activeTab === 'forms') {
+      detectGps();
+    }
+  }, [activeTab]);
+
+  const handleSubmitCheckinFromTab = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNome.trim() || !formPlaca.trim() || !formRota.trim()) return;
+
+    setFormSubmitting(true);
+    const cleanPlaca = formPlaca.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const local = 'Pátio Condomínio SYS Gama (Ponte Alta)';
+
+    try {
+      if (onRegisterDriver) {
+        await onRegisterDriver({
+          nome: formNome.trim(),
+          placa: cleanPlaca,
+          rota: formRota.trim().toUpperCase(),
+          cidade: formCidade.trim(),
+          telefone: formTelefone.trim(),
+          horarioChegada: nowTime,
+          localizacao: local,
+          latitude: driverLat || BASE_LAT,
+          longitude: driverLng || BASE_LNG,
+          mapsUrl: `https://www.google.com/maps?q=${driverLat || BASE_LAT},${driverLng || BASE_LNG}`,
+        });
+      }
+
+      setFormSuccessNotice(`Check-in de ${cleanPlaca} realizado com sucesso! Você entrou na fila.`);
+      setFormNome('');
+      setFormPlaca('');
+      setFormRota('');
+      setFormTelefone('');
+
+      setTimeout(() => {
+        const matching = drivers.find((d) => d.placa.toUpperCase() === cleanPlaca);
+        if (matching) {
+          handleSelectDriver(matching.id);
+        }
+        setActiveTab('meu-carro');
+      }, 600);
+    } catch (err: any) {
+      console.error('Error submitting checkin from tab:', err);
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
 
   // Update clock every second
   useEffect(() => {
@@ -314,17 +444,17 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
         </div>
 
         {/* Top Segmented Tab Switcher */}
-        <div className="max-w-md mx-auto w-full mt-2.5 grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
+        <div className="max-w-md mx-auto w-full mt-2.5 grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
           <button
             onClick={() => setActiveTab('meu-carro')}
-            className={`py-2 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer relative whitespace-nowrap leading-snug ${
+            className={`py-2 px-1 rounded-lg text-[10px] sm:text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer relative whitespace-nowrap leading-snug ${
               activeTab === 'meu-carro'
                 ? 'bg-amber-500 text-slate-950 shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Car className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Meu Status</span>
+            <span className="truncate">Status</span>
             {wasCalled && (
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute top-1 right-1" />
             )}
@@ -332,7 +462,7 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
 
           <button
             onClick={() => setActiveTab('fila')}
-            className={`py-2 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap leading-snug ${
+            className={`py-2 px-1 rounded-lg text-[10px] sm:text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap leading-snug ${
               activeTab === 'fila'
                 ? 'bg-amber-500 text-slate-950 shadow-sm'
                 : 'text-slate-400 hover:text-white'
@@ -344,7 +474,7 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
 
           <button
             onClick={() => setActiveTab('docas')}
-            className={`py-2 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap leading-snug ${
+            className={`py-2 px-1 rounded-lg text-[10px] sm:text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap leading-snug ${
               activeTab === 'docas'
                 ? 'bg-amber-500 text-slate-950 shadow-sm'
                 : 'text-slate-400 hover:text-white'
@@ -352,6 +482,18 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
           >
             <Warehouse className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Docas ({freeDocks.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('forms')}
+            className={`py-2 px-1 rounded-lg text-[10px] sm:text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap leading-snug ${
+              activeTab === 'forms'
+                ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Forms</span>
           </button>
         </div>
       </header>
@@ -375,6 +517,29 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
               className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer shadow-sm leading-none"
             >
               Ativar
+            </button>
+          </div>
+        )}
+
+        {/* FORMS QUICK ACCESS BANNER FOR DRIVERS */}
+        {activeTab !== 'forms' && (
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-slate-900 to-slate-900 border border-emerald-500/30 flex items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-bold shrink-0 shadow-md">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white">Formulário de Chegada (Forms)</p>
+                <p className="text-[10px] text-slate-300 truncate">Check-in GPS (150m da base) & Google Forms</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('forms')}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shrink-0 transition cursor-pointer flex items-center gap-1 shadow-sm"
+            >
+              <span>Acessar</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -875,6 +1040,272 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
             </div>
           </div>
         )}
+
+        {/* TAB 4: FORMS DE CHEGADA E CHECK-IN */}
+        {activeTab === 'forms' && (
+          <div className="space-y-4">
+            {/* Header info card */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-500/30 shadow-xl space-y-2">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Formulário de Chegada (Forms)</h2>
+                  <p className="text-[11px] text-slate-400">
+                    Registre sua chegada para entrar na fila de chamada das docas
+                  </p>
+                </div>
+              </div>
+
+              {formSuccessNotice && (
+                <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>{formSuccessNotice}</span>
+                </div>
+              )}
+            </div>
+
+            {/* OPTION 1: GOOGLE FORMS OFICIAL (IF CONFIGURED OR AVAILABLE) */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    Google Forms Oficial
+                  </span>
+                  <h3 className="text-sm font-bold text-white mt-1.5">
+                    Formulário da Guarita / Base
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {formUrl
+                      ? 'Preencha o formulário oficial do Google Forms conectado à planilha da base.'
+                      : 'O link do Google Forms é gerado no painel da administração. Você também pode preencher pelo check-in direto abaixo.'}
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                  <ExternalLink className="w-4 h-4" />
+                </div>
+              </div>
+
+              {formUrl ? (
+                <div className="space-y-2.5 pt-2 border-t border-slate-800">
+                  <a
+                    href={formUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Abrir Formulário no Google Forms ↗</span>
+                  </a>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(formUrl);
+                        setCopiedFormLink(true);
+                        setTimeout(() => setCopiedFormLink(false), 2000);
+                      }}
+                      className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                    >
+                      {copiedFormLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedFormLink ? 'Copiado!' : 'Copiar Link'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowQrForms(!showQrForms)}
+                      className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                    >
+                      <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{showQrForms ? 'Ocultar QR' : 'QR Code'}</span>
+                    </button>
+                  </div>
+
+                  {showQrForms && (
+                    <div className="p-3 bg-white rounded-xl text-center space-y-1 mx-auto max-w-[200px]">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(formUrl)}`}
+                        alt="QR Code Google Forms"
+                        className="w-full h-auto mx-auto"
+                      />
+                      <p className="text-[10px] text-slate-700 font-mono font-bold">Aponte a câmera</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400">
+                  <span>Dica: Use o formulário direto abaixo para entrar na fila com localização GPS automática.</span>
+                </div>
+              )}
+            </div>
+
+            {/* OPTION 2: CHECK-IN DIRETO NO CELULAR COM VALIDAÇÃO GPS (150M) */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+              <div>
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  Check-in Inteligente no Celular
+                </span>
+                <h3 className="text-sm font-bold text-white mt-1.5">
+                  Preenchimento Direto no App
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Base: <strong className="text-slate-200">Condomínio SYS do Gama, Ponte Alta</strong> (Raio máximo de 150m)
+                </p>
+              </div>
+
+              {/* GPS Geofence Status */}
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-emerald-400" />
+                    <span className="text-slate-300 font-medium">Localização GPS:</span>
+                  </div>
+                  {isGpsLoading ? (
+                    <span className="text-[11px] text-amber-400 flex items-center gap-1 font-mono">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Calculando...
+                    </span>
+                  ) : distanceMeters !== null ? (
+                    <span
+                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${
+                        isWithinGeofence || simulationMode
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}
+                    >
+                      {distanceMeters}m da Base
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={detectGps}
+                      className="text-[11px] text-sky-400 underline cursor-pointer"
+                    >
+                      Detectar GPS
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[10px]">
+                  <span className="text-slate-400">
+                    {simulationMode
+                      ? 'Simulação ativa (Dentro da base - 150m)'
+                      : isWithinGeofence
+                      ? '✅ Você está dentro do raio permitido (150m)'
+                      : '⚠️ Limite é 150m do Condomínio SYS do Gama'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSimulationMode(!simulationMode)}
+                    className="text-amber-400 hover:underline font-mono cursor-pointer shrink-0"
+                  >
+                    {simulationMode ? 'Desativar Teste' : 'Modo Teste'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Input Fields */}
+              <form onSubmit={handleSubmitCheckinFromTab} className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-slate-300 font-semibold mb-1">
+                    Nome Completo do Motorista *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: João Ferreira de Souza"
+                      value={formNome}
+                      onChange={(e) => setFormNome(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                    <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-slate-300 font-semibold mb-1">
+                      Placa do Veículo *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: ABC1D23"
+                      maxLength={8}
+                      value={formPlaca}
+                      onChange={(e) => setFormPlaca(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-white uppercase placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-slate-300 font-semibold mb-1">
+                      Rota Alfanumérica *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: DF-01, RT-102"
+                      value={formRota}
+                      onChange={(e) => setFormRota(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-white uppercase placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-slate-300 font-semibold mb-1">
+                      Telefone / WhatsApp
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="(61) 99999-9999"
+                      value={formTelefone}
+                      onChange={(e) => setFormTelefone(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-slate-300 font-semibold mb-1">
+                      Cidade / Região
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Gama - DF"
+                      value={formCidade}
+                      onChange={(e) => setFormCidade(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={formSubmitting || (!isWithinGeofence && !simulationMode)}
+                  className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{formSubmitting ? 'Gravando Check-in...' : 'Enviar Check-in e Entrar na Fila'}</span>
+                </button>
+              </form>
+            </div>
+
+            {/* FULLSCREEN CHECK-IN BUTTON */}
+            <button
+              type="button"
+              onClick={onGoToCheckin}
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <Navigation className="w-4 h-4 text-emerald-400" />
+              <span>Abrir Modo Check-in com Radar em Tela Cheia</span>
+            </button>
+          </div>
+        )}
       </main>
 
       {/* FIXED BOTTOM THUMB NAVIGATION BAR (FITS MOBILE SCREEN PERFECTLY) */}
@@ -922,11 +1353,15 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
           </button>
 
           <button
-            onClick={onGoToCheckin}
-            className="flex flex-col items-center justify-center py-1 px-1.5 rounded-xl text-emerald-400 hover:text-emerald-300 transition cursor-pointer min-w-[56px] text-center"
+            onClick={() => setActiveTab('forms')}
+            className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition cursor-pointer min-w-[56px] text-center ${
+              activeTab === 'forms'
+                ? 'text-emerald-400 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
           >
-            <MapPin className="w-5 h-5" />
-            <span className="text-[10px] mt-1 font-bold whitespace-nowrap leading-tight text-center">Check-in</span>
+            <FileText className="w-5 h-5" />
+            <span className="text-[10px] mt-1 font-bold whitespace-nowrap leading-tight text-center">Forms</span>
           </button>
         </div>
       </nav>

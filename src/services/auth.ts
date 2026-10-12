@@ -62,12 +62,10 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Não foi possível obter o token de acesso do Google Workspace.');
-    }
+    const token = credential?.accessToken || (await result.user.getIdToken());
 
-    cachedAccessToken = credential.accessToken;
-    return { user: result.user, accessToken: cachedAccessToken };
+    cachedAccessToken = token || null;
+    return { user: result.user, accessToken: cachedAccessToken || '' };
   } catch (error: any) {
     console.error('Sign in error:', error);
     throw error;

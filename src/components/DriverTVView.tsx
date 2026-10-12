@@ -566,14 +566,26 @@ export const DriverTVView: React.FC<DriverTVViewProps> = ({
                 {typeof window !== 'undefined' ? `${window.location.origin}/?view=motorista` : ''}
               </p>
 
-              {onOpenCheckin && (
-                <button
-                  onClick={onOpenCheckin}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer border border-slate-700"
-                >
-                  Novo Check-in de Chegada
-                </button>
-              )}
+              <div className="flex flex-col gap-2 pt-1">
+                {formUrl && (
+                  <a
+                    href={formUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20"
+                  >
+                    <span>Abrir Google Forms Oficial ↗</span>
+                  </a>
+                )}
+                {onOpenCheckin && (
+                  <button
+                    onClick={onOpenCheckin}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer border border-slate-700"
+                  >
+                    Novo Check-in de Chegada (GPS 150m)
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

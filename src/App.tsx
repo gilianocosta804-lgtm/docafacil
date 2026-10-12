@@ -374,11 +374,37 @@ export default function App() {
       const result = await googleSignIn();
       if (result) {
         setUser(result.user);
-        setToken(result.accessToken);
+        if (result.accessToken) {
+          setToken(result.accessToken);
+          setCachedAccessToken(result.accessToken);
+        }
+
+        const email = result.user.email || 'admin.google';
+        adminService.authorizeGoogleUser(email, result.user.displayName || undefined);
+
+        const googleAuthUser: AuthorizedUser = {
+          id: `usr-google-${result.user.uid?.slice(0, 8) || 'adm'}`,
+          name: result.user.displayName || email.split('@')[0] || 'Administrador Google',
+          cpf: '---',
+          phone: '---',
+          username: email,
+          password: '---',
+          role: 'admin_geral',
+          status: 'ativo',
+          createdAt: new Date().toLocaleDateString('pt-BR'),
+          notes: `Conectado via Google Workspace (${email})`,
+        };
+
+        setActiveSession(googleAuthUser);
+        adminService.setCurrentSession(googleAuthUser);
+        setIsLoginModalOpen(false);
+        handleViewChange('dashboard');
+
         triggerSync();
       }
     } catch (err: any) {
       console.error('Google Sign In failed:', err);
+      throw err;
     }
   };
 
@@ -1057,6 +1083,7 @@ export default function App() {
           formUrl={config.formResponderUrl || config.formUrl}
           isSyncing={isSyncing}
           onTriggerSync={triggerSync}
+          onRegisterDriver={handleRegisterDriver}
         />
       )}
 
