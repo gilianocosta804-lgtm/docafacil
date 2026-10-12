@@ -1,0 +1,6 @@
+{
+  "name": "DocaFácil - Gestão de Chamada de Motoristas",
+  "description": "Sistema integrado com Google Sheets e Google Forms para controle em tempo real de chamadas, docas de carregamento e painel de motoristas com alertas sonoros e visuais.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

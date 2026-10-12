@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@layer base {
+  html, body {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Safe word-wrapping and line spacing on mobile devices */
+  p, span, h1, h2, h3, h4, h5, h6, label, button, a {
+    overflow-wrap: break-word;
+  }
+}
