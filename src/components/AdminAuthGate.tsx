@@ -164,7 +164,7 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
                   type="text"
                   required
                   autoFocus
-                  placeholder="Ex: admin, 123.456.789-00 ou (11) 98765-4321"
+                  placeholder="Ex: GilianoCosta, admin, 123.456.789-00 ou (11) 98765-4321"
                   value={usernameInput}
                   onChange={(e) => setUsernameInput(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
@@ -176,15 +176,15 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-[11px] font-mono font-semibold text-slate-300 uppercase">
-                  Senha (8 Dígitos Mesclados)
+                  Senha
                 </label>
-                <span className="text-[9px] text-amber-400 font-mono">Maiúsculas e minúsculas</span>
+                <span className="text-[9px] text-amber-400 font-mono">Gili2112#@! ou 8 dígitos</span>
               </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder="Senha mesclada de 8 dígitos"
+                  placeholder="Digite sua senha de acesso"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
                   className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-mono placeholder:text-slate-500 focus:outline-none focus:border-amber-500 tracking-wider"
@@ -212,16 +212,16 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
             {/* Quick credentials hint */}
             <div className="pt-2 border-t border-slate-800/80">
               <p className="text-[10px] text-slate-400 mb-1.5">
-                Exemplos de logins cadastrados na planilha:
+                Credencial Mestre do Administrador Geral:
               </p>
               <div className="flex flex-col gap-1.5">
                 <button
                   type="button"
-                  onClick={() => handleQuickFill('admin', 'Gi15L0i1')}
-                  className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-left flex items-center justify-between transition cursor-pointer"
+                  onClick={() => handleQuickFill('GilianoCosta', 'Gili2112#@!')}
+                  className="p-2.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-mono text-left flex items-center justify-between transition cursor-pointer"
                 >
-                  <span className="text-amber-300 font-bold">Admin Mestre: admin</span>
-                  <span className="text-slate-300">Senha: Gi15L0i1</span>
+                  <span className="text-amber-300 font-bold">Admin Mestre: GilianoCosta</span>
+                  <span className="text-amber-200 font-bold">Senha: Gili2112#@!</span>
                 </button>
                 <button
                   type="button"

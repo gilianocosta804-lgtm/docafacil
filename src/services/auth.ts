@@ -60,7 +60,33 @@ export const initAuth = (
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
+    let result;
+    try {
+      result = await signInWithPopup(auth, provider);
+    } catch (popupErr: any) {
+      if (popupErr?.code === 'auth/popup-blocked') {
+        throw new Error('O navegador bloqueou a janela de login do Google. Por favor, permita pop-ups para este site.');
+      }
+      if (popupErr?.code === 'auth/popup-closed-by-user') {
+        throw new Error('A janela de login do Google foi fechada antes de concluir.');
+      }
+      if (popupErr?.code === 'auth/cancelled-popup-request') {
+        return null;
+      }
+      // Fallback: retry with basic provider if custom scopes triggered an error
+      try {
+        const basicProvider = new GoogleAuthProvider();
+        basicProvider.setCustomParameters({ prompt: 'select_account' });
+        result = await signInWithPopup(auth, basicProvider);
+      } catch {
+        throw popupErr;
+      }
+    }
+
+    if (!result || !result.user) {
+      return null;
+    }
+
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const token = credential?.accessToken || (await result.user.getIdToken());
 
