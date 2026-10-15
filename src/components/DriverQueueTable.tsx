@@ -39,6 +39,9 @@ export const DriverQueueTable: React.FC<DriverQueueTableProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('todos');
 
   const myDockNome = activeSession?.assignedDockNome;
+  const isOperator = !isAdmin && activeSession?.role === 'operador';
+  const myAssignedDock = docks.find((d) => d.id === activeSession?.assignedDockId);
+  const isMyDockFree = myAssignedDock ? myAssignedDock.status === 'livre' : false;
 
   // Filter drivers
   const filteredDrivers = drivers.filter((driver) => {
@@ -369,10 +372,24 @@ export const DriverQueueTable: React.FC<DriverQueueTableProps> = ({
                         {driver.status === 'aguardando' && (
                           <button
                             onClick={() => onCallDriver(driver)}
-                            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-amber-500/20"
+                            disabled={isOperator && (!activeSession?.assignedDockId || !isMyDockFree)}
+                            title={
+                              isOperator
+                                ? !activeSession?.assignedDockId
+                                  ? 'Você não possui doca atribuída para chamar'
+                                  : !isMyDockFree
+                                  ? `Sua doca (${myDockNome || 'sua doca'}) não está livre no momento`
+                                  : `Chamar para sua doca (${myDockNome || 'sua doca'})`
+                                : 'Chamar motorista para uma doca livre'
+                            }
+                            className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition shadow-sm ${
+                              isOperator && (!activeSession?.assignedDockId || !isMyDockFree)
+                                ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-50'
+                                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20 cursor-pointer'
+                            }`}
                           >
                             <BellRing className="w-3.5 h-3.5" />
-                            Chamar
+                            <span>{isOperator ? `Chamar (${myDockNome || 'Doca'})` : 'Chamar'}</span>
                           </button>
                         )}
 

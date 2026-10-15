@@ -31,6 +31,7 @@ interface AdminAuthGateProps {
   onLoginSuccess: (authUser: AuthorizedUser) => void;
   docks?: Dock[];
   onClose?: () => void;
+  hasToken?: boolean;
 }
 
 export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
@@ -41,6 +42,7 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
   onLoginSuccess,
   docks = [],
   onClose,
+  hasToken = false,
 }) => {
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -228,7 +230,7 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
                   onClick={() => handleQuickFill('operador', 'Ca25R0l0')}
                   className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-left flex items-center justify-between transition cursor-pointer"
                 >
-                  <span className="text-sky-300 font-bold">Operador: operador</span>
+                  <span className="text-sky-300 font-bold">Operador: operador (Doca 01)</span>
                   <span className="text-slate-300">Senha: Ca25R0l0</span>
                 </button>
               </div>
@@ -256,7 +258,7 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
             {!user ? (
               <div className="space-y-3">
                 <p className="text-xs text-slate-300">
-                  Clique abaixo para autenticar e entrar diretamente na Dashboard:
+                  Clique abaixo para autenticar com sua Conta Google:
                 </p>
                 <div className="flex justify-center">
                   <GoogleSignInButton
@@ -276,16 +278,45 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
                     className="w-full justify-center"
                   />
                 </div>
+                <p className="text-[11px] text-slate-400 text-center">
+                  Habilita controle completo de Docas, sincronização no Google Sheets e Google Forms.
+                </p>
               </div>
             ) : (
               <div className="space-y-3 text-center">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Conta Google Conectada!</span>
+                  <span>Conta Google Conectada: {user.email}</span>
                 </div>
-                <p className="text-xs text-slate-300">
-                  Conectado como <span className="font-mono text-amber-400 font-bold">{user.email}</span>.
-                </p>
+
+                {!hasToken && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] text-left">
+                    <p className="font-semibold mb-1">Conectar Permissão do Google Sheets:</p>
+                    <p className="text-slate-300">
+                      Para sincronizar em tempo real as planilhas e formulários, renove a permissão clicando no botão abaixo:
+                    </p>
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={async () => {
+                        setErrorMessage('');
+                        setIsLoading(true);
+                        try {
+                          await onSignIn();
+                        } catch (err: any) {
+                          setErrorMessage(err?.message || 'Erro ao obter permissões do Google Sheets.');
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}
+                      className="mt-2 w-full py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>{isLoading ? 'Conectando...' : 'Autorizar Google Sheets & Forms'}</span>
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -301,10 +332,12 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
                       createdAt: new Date().toLocaleDateString('pt-BR'),
                     });
                   }}
-                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer shadow-lg shadow-amber-500/20"
+                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5"
                 >
-                  Entrar na Dashboard Agora
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Entrar na Dashboard Agora</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={onSignOut}
@@ -348,8 +381,8 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({
                 <ClipboardList className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-white">Check-in de Chegada Automático</p>
-                <p className="text-[10px] text-slate-400">Localização GPS, data e horário automáticos</p>
+                <p className="text-xs font-bold text-white">Check-in de Chegada na Base</p>
+                <p className="text-[10px] text-slate-400">Leitura QR Code na Portaria, data e horário automáticos</p>
               </div>
             </div>
             <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition" />

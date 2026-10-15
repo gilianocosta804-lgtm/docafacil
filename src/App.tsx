@@ -431,6 +431,18 @@ export default function App() {
 
   // OPERATIONAL ACTION 1: CALL DRIVER TO DOCK
   const handleCallDriverToDock = async (driver: DriverEntry, targetDock: Dock) => {
+    // Strict restriction: Operator can ONLY call to their own assigned dock
+    if (!isAdmin && activeSession?.role === 'operador') {
+      if (!activeSession.assignedDockId) {
+        alert('Acesso restrito: Como operador, você precisa ter uma doca atribuída para chamar carros. Solicite ao Administrador.');
+        return;
+      }
+      if (activeSession.assignedDockId !== targetDock.id) {
+        alert(`Acesso restrito: Como operador, você só pode chamar carros para sua própria doca (${activeSession.assignedDockNome || 'sua doca'}). Chamada bloqueada para outras docas.`);
+        return;
+      }
+    }
+
     setIsLoadingAction(true);
     try {
       const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1014,6 +1026,7 @@ export default function App() {
               onSignOut={handleSignOut}
               onNavigate={handleViewChange}
               docks={docks}
+              hasToken={!!token}
               onLoginSuccess={(authUser) => {
                 setActiveSession(authUser);
                 adminService.setCurrentSession(authUser);
@@ -1031,6 +1044,8 @@ export default function App() {
               drivers={drivers}
               docks={docks}
               config={config}
+              accessToken={token}
+              onSignIn={handleSignIn}
               onCallDriverToDock={handleCallDriverToDock}
               onStartLoading={handleStartLoading}
               onFinishLoading={handleFinishLoading}
@@ -1195,6 +1210,7 @@ export default function App() {
               user={user}
               onSignIn={handleSignIn}
               onSignOut={handleSignOut}
+              hasToken={!!token}
               onNavigate={(view) => {
                 setIsLoginModalOpen(false);
                 handleViewChange(view);

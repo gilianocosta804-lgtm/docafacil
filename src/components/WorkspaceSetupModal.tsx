@@ -35,6 +35,7 @@ export const WorkspaceSetupModal: React.FC<WorkspaceSetupModalProps> = ({
   onTriggerSync,
 }) => {
   const [spreadsheetIdInput, setSpreadsheetIdInput] = useState(config.spreadsheetId || '');
+  const [formUrlInput, setFormUrlInput] = useState(config.formResponderUrl || config.formUrl || '');
   const [syncInterval, setSyncInterval] = useState(config.autoSyncInterval || 5);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [creationStatus, setCreationStatus] = useState<string>('');
@@ -129,10 +130,13 @@ export const WorkspaceSetupModal: React.FC<WorkspaceSetupModalProps> = ({
 
   const handleSaveManual = () => {
     const cleanId = parseSpreadsheetId(spreadsheetIdInput);
+    const cleanForm = formUrlInput.trim();
     const newConfig: WorkspaceConfig = {
       ...config,
       spreadsheetId: cleanId,
       spreadsheetUrl: cleanId ? `https://docs.google.com/spreadsheets/d/${cleanId}/edit` : '',
+      formUrl: cleanForm || config.formUrl,
+      formResponderUrl: cleanForm || config.formResponderUrl,
       autoSyncInterval: syncInterval,
     };
     onSaveConfig(newConfig);
@@ -331,6 +335,22 @@ export const WorkspaceSetupModal: React.FC<WorkspaceSetupModalProps> = ({
                 className="flex-1 px-3.5 py-2.5 bg-slate-950/80 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              Link do Google Forms dos Motoristas (Opcional):
+            </label>
+            <input
+              type="text"
+              value={formUrlInput}
+              onChange={(e) => setFormUrlInput(e.target.value)}
+              placeholder="Ex: https://docs.google.com/forms/d/e/.../viewform"
+              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              Ficará visível e acessível imediatamente no painel dos motoristas em seus celulares.
+            </p>
           </div>
 
           <div className="flex items-center justify-between p-3 bg-slate-950/40 rounded-xl border border-slate-800">

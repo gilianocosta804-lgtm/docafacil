@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Car, MapPin, X, ArrowRight, Clock, ShieldCheck } from 'lucide-react';
-import { DriverEntry, Dock } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Car, MapPin, X, ArrowRight, Clock, ShieldCheck, Lock, AlertTriangle } from 'lucide-react';
+import { DriverEntry, Dock, AuthorizedUser } from '../types';
 
 interface CallModalProps {
   isOpen: boolean;
@@ -10,6 +10,8 @@ interface CallModalProps {
   onClose: () => void;
   onConfirmCall: (driver: DriverEntry, dock: Dock) => void;
   isLoading?: boolean;
+  activeSession?: AuthorizedUser | null;
+  isAdmin?: boolean;
 }
 
 export const CallModal: React.FC<CallModalProps> = ({
@@ -20,19 +22,44 @@ export const CallModal: React.FC<CallModalProps> = ({
   onClose,
   onConfirmCall,
   isLoading = false,
+  activeSession,
+  isAdmin = false,
 }) => {
-  const [selectedDockId, setSelectedDockId] = useState<string>(
-    preselectedDockId || docks.find(d => d.status === 'livre')?.id || docks[0]?.id || ''
-  );
+  const isOperator = !isAdmin && activeSession?.role === 'operador';
+  const operatorAssignedDockId = activeSession?.assignedDockId;
+
+  const initialDockId = isOperator && operatorAssignedDockId
+    ? operatorAssignedDockId
+    : (preselectedDockId || docks.find(d => d.status === 'livre')?.id || docks[0]?.id || '');
+
+  const [selectedDockId, setSelectedDockId] = useState<string>(initialDockId);
+
+  useEffect(() => {
+    if (isOperator && operatorAssignedDockId) {
+      setSelectedDockId(operatorAssignedDockId);
+    } else if (preselectedDockId) {
+      setSelectedDockId(preselectedDockId);
+    }
+  }, [isOperator, operatorAssignedDockId, preselectedDockId]);
 
   if (!isOpen || !driver) return null;
 
-  const availableDocks = docks.filter(d => d.status === 'livre' || d.id === preselectedDockId);
   const targetDock = docks.find(d => d.id === selectedDockId);
+  const isTargetDockFree = targetDock?.status === 'livre';
+
+  // An operator can only confirm call if their own dock is free and selected
+  const canConfirm = targetDock && (isAdmin ? isTargetDockFree : (isTargetDockFree && targetDock.id === operatorAssignedDockId));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetDock) return;
+    if (isOperator) {
+      if (!operatorAssignedDockId || targetDock.id !== operatorAssignedDockId) {
+        alert(`Acesso restrito: Como operador, você só pode chamar carros para sua própria doca (${activeSession?.assignedDockNome || 'sua mesa'}).`);
+        return;
+      }
+    }
+    if (!canConfirm) return;
     onConfirmCall(driver, targetDock);
   };
 
@@ -77,8 +104,8 @@ export const CallModal: React.FC<CallModalProps> = ({
 
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-xs">
             <div className="flex items-center gap-1.5 text-slate-300">
-              <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-              <span className="truncate">{driver.localizacao}</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">{driver.localizacao || 'Pátio da Base (QR Code)'}</span>
             </div>
             <div className="flex items-center gap-1.5 text-slate-300">
               <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -101,60 +128,79 @@ export const CallModal: React.FC<CallModalProps> = ({
                 </span>
               )}
             </div>
-
-            {driver.mapsUrl && (
-              <a
-                href={driver.mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sky-400 hover:text-sky-300 text-[11px] font-mono underline"
-              >
-                Abrir Google Maps ↗
-              </a>
-            )}
           </div>
         </div>
 
         {/* Dock Selection */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-              Selecione a Doca de Carregamento:
-            </label>
+            {isOperator && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 mb-3">
+                <Lock className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>
+                  <strong>Regra Operacional:</strong> Você só pode chamar carros para a sua própria doca (<strong>{activeSession?.assignedDockNome || 'sua doca'}</strong>). Todas as outras docas estão bloqueadas para este operador.
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                {isOperator ? 'Sua Doca Exclusiva de Chamada:' : 'Selecione a Doca de Carregamento:'}
+              </label>
+              {isOperator && (
+                <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1 font-bold">
+                  <Lock className="w-3 h-3 text-amber-400" />
+                  Bloqueio Ativo (Docas de Terceiros)
+                </span>
+              )}
+            </div>
+
             <div className="grid grid-cols-3 gap-2.5">
               {docks.map((dock) => {
                 const isSelected = selectedDockId === dock.id;
                 const isFree = dock.status === 'livre';
+                const isDockAllowed = isAdmin || (isOperator && dock.id === operatorAssignedDockId);
 
                 return (
                   <button
                     key={dock.id}
                     type="button"
-                    onClick={() => setSelectedDockId(dock.id)}
-                    className={`p-3 rounded-xl border text-left transition relative cursor-pointer ${
-                      isSelected
-                        ? 'bg-amber-500/20 border-amber-400 text-white shadow-md ring-2 ring-amber-400/40'
+                    disabled={!isDockAllowed || (!isAdmin && !isFree)}
+                    onClick={() => {
+                      if (isDockAllowed) setSelectedDockId(dock.id);
+                    }}
+                    className={`p-3 rounded-xl border text-left transition relative ${
+                      !isDockAllowed
+                        ? 'bg-slate-950/60 border-slate-900 text-slate-600 cursor-not-allowed opacity-40'
+                        : isSelected
+                        ? 'bg-amber-500/20 border-amber-400 text-white shadow-md ring-2 ring-amber-400/40 cursor-pointer'
                         : isFree
-                        ? 'bg-slate-800/80 border-slate-700 hover:border-slate-500 text-slate-200'
+                        ? 'bg-slate-800/80 border-slate-700 hover:border-slate-500 text-slate-200 cursor-pointer'
                         : 'bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-bold text-sm">{dock.nome}</span>
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          dock.status === 'livre'
-                            ? 'bg-emerald-400'
-                            : dock.status === 'chamando'
-                            ? 'bg-amber-400 animate-ping'
-                            : dock.status === 'carregando'
-                            ? 'bg-sky-400'
-                            : 'bg-rose-400'
-                        }`}
-                      />
+                      {!isDockAllowed ? (
+                        <Lock className="w-3.5 h-3.5 text-slate-600" />
+                      ) : (
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            dock.status === 'livre'
+                              ? 'bg-emerald-400'
+                              : dock.status === 'chamando'
+                              ? 'bg-amber-400 animate-ping'
+                              : dock.status === 'carregando'
+                              ? 'bg-sky-400'
+                              : 'bg-rose-400'
+                          }`}
+                        />
+                      )}
                     </div>
                     <span className="text-[10px] uppercase font-mono block opacity-80">
-                      {dock.status === 'livre'
+                      {!isDockAllowed
+                        ? 'Outro Operador'
+                        : dock.status === 'livre'
                         ? 'Livre'
                         : dock.status === 'chamando'
                         ? 'Chamando'
@@ -167,6 +213,25 @@ export const CallModal: React.FC<CallModalProps> = ({
               })}
             </div>
           </div>
+
+          {/* Operator Status Feedback */}
+          {isOperator && !isTargetDockFree && (
+            <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>
+                Sua doca ({activeSession?.assignedDockNome || targetDock?.nome || 'sua mesa'}) não está livre no momento. Conclua o carregamento atual para chamar este carro.
+              </span>
+            </div>
+          )}
+
+          {isOperator && isTargetDockFree && (
+            <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>
+                Carro será chamado exclusivamente para sua doca: <strong>{targetDock?.nome}</strong> ({activeSession?.name}).
+              </span>
+            </div>
+          )}
 
           {/* Voice Preview Box */}
           <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs text-slate-400">

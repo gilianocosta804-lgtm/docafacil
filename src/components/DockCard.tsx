@@ -67,10 +67,10 @@ export const DockCard: React.FC<DockCardProps> = ({
   const [showPauseMenu, setShowPauseMenu] = useState(false);
 
   // Check if current user is restricted to a specific dock
+  // An operator can ONLY call cars and operate their own assigned dock. Admins can operate any dock.
   const userAssignedDockId = activeSession?.assignedDockId;
-  const isMyDock = !userAssignedDockId || userAssignedDockId === dock.id;
-  // Collaborator can move cars ONLY from their dock! Admins can move from any dock.
-  const canOperateThisDock = isAdmin || isMyDock;
+  const isMyDock = isAdmin ? true : Boolean(userAssignedDockId && userAssignedDockId === dock.id);
+  const canOperateThisDock = isMyDock;
 
   // Granular permissions for collaborators
   const canCall = isAdmin || (permissions ? permissions.canCallDrivers : true);

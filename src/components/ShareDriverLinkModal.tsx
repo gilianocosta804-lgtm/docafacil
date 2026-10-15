@@ -56,10 +56,10 @@ export const ShareDriverLinkModal: React.FC<ShareDriverLinkModalProps> = ({
     },
     {
       key: 'checkin',
-      title: '📝 Check-in Automático de Chegada',
-      description: 'Link direto com detecção automática de localização GPS, data e horário ao chegar no pátio.',
+      title: '📝 Check-in por QR Code na Base',
+      description: 'Link oficial com leitura de QR Code na Guarita/Portaria para confirmação de chegada presencial do carro.',
       url: `${baseUrl}?view=checkin`,
-      icon: ClipboardList,
+      icon: QrCode,
       color: 'emerald',
       openAction: onOpenCheckinView,
     },

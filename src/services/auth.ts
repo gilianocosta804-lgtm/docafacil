@@ -19,16 +19,6 @@ export const SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
 ];
 
-const provider = new GoogleAuthProvider();
-SCOPES.forEach((scope) => {
-  provider.addScope(scope);
-});
-
-// Prompt consent to ensure refreshed tokens with granted scopes
-provider.setCustomParameters({
-  prompt: 'select_account',
-});
-
 // Flag to indicate if we are in the middle of a sign-in flow.
 let isSigningIn = false;
 // Cache the access token in memory.
@@ -44,9 +34,7 @@ export const initAuth = (
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
-        // If user is logged in from a previous session but memory token is lost,
-        // we can still notify that user exists, but API calls requiring Google Workspace
-        // will prompt sign-in again to acquire the OAuth bearer token.
+        // User is logged in via Firebase session, but memory token needs fresh sign-in click
         if (onAuthSuccess) onAuthSuccess(user, null);
       }
     } else {
@@ -60,27 +48,42 @@ export const initAuth = (
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
+
+    // Create fresh provider with all Workspace scopes for Google Sheets and Forms
+    const provider = new GoogleAuthProvider();
+    SCOPES.forEach((scope) => {
+      provider.addScope(scope);
+    });
+
+    provider.setCustomParameters({
+      prompt: 'select_account',
+    });
+
     let result;
     try {
       result = await signInWithPopup(auth, provider);
     } catch (popupErr: any) {
+      console.error('Firebase signInWithPopup error:', popupErr);
+
       if (popupErr?.code === 'auth/popup-blocked') {
-        throw new Error('O navegador bloqueou a janela de login do Google. Por favor, permita pop-ups para este site.');
+        throw new Error('O navegador bloqueou a janela pop-up do Google. Por favor, permita pop-ups para este site.');
       }
       if (popupErr?.code === 'auth/popup-closed-by-user') {
-        throw new Error('A janela de login do Google foi fechada antes de concluir.');
+        throw new Error('A janela de login do Google foi fechada antes de concluir a autorização.');
       }
       if (popupErr?.code === 'auth/cancelled-popup-request') {
         return null;
       }
-      // Fallback: retry with basic provider if custom scopes triggered an error
-      try {
-        const basicProvider = new GoogleAuthProvider();
-        basicProvider.setCustomParameters({ prompt: 'select_account' });
-        result = await signInWithPopup(auth, basicProvider);
-      } catch {
-        throw popupErr;
+      if (popupErr?.code === 'auth/unauthorized-domain') {
+        throw new Error(
+          'Domínio aguardando sincronização no Firebase Auth. Você também pode entrar com o usuário mestre (Login: GilianoCosta / Senha: Gili2112#@!).'
+        );
       }
+      if (popupErr?.code === 'auth/operation-not-allowed') {
+        throw new Error('Provedor Google sendo inicializado no Firebase. Tente novamente em instantes.');
+      }
+
+      throw new Error(popupErr?.message || 'Falha na autenticação com a conta Google.');
     }
 
     if (!result || !result.user) {
@@ -88,9 +91,13 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
 
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    const token = credential?.accessToken || (await result.user.getIdToken());
+    const token = credential?.accessToken || null;
 
-    cachedAccessToken = token || null;
+    if (!token) {
+      console.warn('GoogleAuthProvider credentialFromResult returned no accessToken.');
+    }
+
+    cachedAccessToken = token;
     return { user: result.user, accessToken: cachedAccessToken || '' };
   } catch (error: any) {
     console.error('Sign in error:', error);
@@ -112,3 +119,4 @@ export const logout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
 };
+

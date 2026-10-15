@@ -70,6 +70,8 @@ interface DashboardViewProps {
   activeSession: AuthorizedUser | null;
   permissions?: CollaboratorPermissions;
   isLoadingAction: boolean;
+  accessToken?: string | null;
+  onSignIn?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -99,6 +101,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   activeSession,
   permissions,
   isLoadingAction,
+  accessToken,
+  onSignIn,
 }) => {
   // Modals state
   const [callModalDriver, setCallModalDriver] = useState<DriverEntry | null>(null);
@@ -139,6 +143,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Handler for calling the first waiting driver
   const handleCallFirst = (targetDock: Dock) => {
+    if (!isAdmin && activeSession?.role === 'operador') {
+      if (!activeSession.assignedDockId) {
+        alert('Acesso restrito: você precisa ter uma doca atribuída para chamar carros. Solicite ao Administrador.');
+        return;
+      }
+      if (activeSession.assignedDockId !== targetDock.id) {
+        alert(`Acesso restrito: Como operador, você só pode chamar carros para sua própria doca (${activeSession.assignedDockNome || 'sua doca'}). Bloqueado para outras docas.`);
+        return;
+      }
+    }
     if (waitingDrivers.length === 0) {
       alert('Não há motoristas aguardando na fila no momento.');
       return;
@@ -149,6 +163,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   const handleSelectDriverForDock = (targetDock: Dock) => {
+    if (!isAdmin && activeSession?.role === 'operador') {
+      if (!activeSession.assignedDockId) {
+        alert('Acesso restrito: você precisa ter uma doca atribuída para chamar carros. Solicite ao Administrador.');
+        return;
+      }
+      if (activeSession.assignedDockId !== targetDock.id) {
+        alert(`Acesso restrito: Como operador, você só pode chamar carros para sua própria doca (${activeSession.assignedDockNome || 'sua doca'}). Bloqueado para outras docas.`);
+        return;
+      }
+    }
     setPreselectedDockId(targetDock.id);
     if (waitingDrivers.length > 0) {
       setCallModalDriver(waitingDrivers[0]);
@@ -188,7 +212,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const canTransfer = isAdmin || (permissions ? permissions.canTransferPackages : true);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* GOOGLE SHEETS SESSION STATUS BANNER IF DISCONNECTED */}
+      {!accessToken && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+              <FileSpreadsheet className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white">Google Sheets & Forms Desconectado Nesta Sessão</p>
+              <p className="text-[11px] text-slate-300">
+                Para sincronizar os dados dos motoristas e permitir que os carros entrem pela planilha em tempo real, conecte sua conta Google autorizada.
+              </p>
+            </div>
+          </div>
+          {onSignIn && (
+            <button
+              type="button"
+              onClick={onSignIn}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Conectar Google Sheets</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* DAILY CALL SPREADSHEET STATUS BAR */}
       <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
         <div className="flex items-center gap-3">
@@ -371,10 +422,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {waitingDrivers.length > 0 && freeDocks > 0 && (
               <button
                 onClick={() => {
-                  const firstFree = docks.find((d) => d.status === 'livre');
-                  if (firstFree) handleCallFirst(firstFree);
+                  const targetDock = isAdmin
+                    ? docks.find((d) => d.status === 'livre')
+                    : docks.find((d) => d.id === activeSession?.assignedDockId && d.status === 'livre');
+                  if (targetDock) handleCallFirst(targetDock);
                 }}
-                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-amber-500/20"
+                disabled={!isAdmin && !docks.some(d => d.id === activeSession?.assignedDockId && d.status === 'livre')}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                title={
+                  !isAdmin && !docks.some(d => d.id === activeSession?.assignedDockId && d.status === 'livre')
+                    ? `Sua doca (${activeSession?.assignedDockNome || 'sua mesa'}) não está livre`
+                    : 'Chamar próximo carro para sua doca'
+                }
               >
                 <BellRing className="w-3.5 h-3.5" />
                 Chamar Próximo ({waitingDrivers[0].nome.split(' ')[0]})
@@ -459,6 +518,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           drivers={drivers}
           docks={docks}
           onCallDriver={(driver) => {
+            if (!isAdmin && activeSession?.role === 'operador') {
+              if (!activeSession.assignedDockId) {
+                alert('Acesso restrito: Você precisa ter uma doca atribuída para chamar carros. Solicite ao Administrador.');
+                return;
+              }
+              const myDock = docks.find((d) => d.id === activeSession.assignedDockId);
+              if (!myDock) {
+                alert('Doca atribuída não encontrada.');
+                return;
+              }
+              if (myDock.status !== 'livre') {
+                alert(`Sua doca (${activeSession.assignedDockNome || myDock.nome}) não está livre no momento (${myDock.status.toUpperCase()}). Conclua o carregamento em andamento antes de chamar outro carro.`);
+                return;
+              }
+              setCallModalDriver(driver);
+              setPreselectedDockId(activeSession.assignedDockId);
+              return;
+            }
             setCallModalDriver(driver);
             setPreselectedDockId(docks.find((d) => d.status === 'livre')?.id);
           }}
@@ -476,6 +553,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         preselectedDockId={preselectedDockId}
         onClose={() => setCallModalDriver(null)}
         isLoading={isLoadingAction}
+        activeSession={activeSession}
+        isAdmin={isAdmin}
         onConfirmCall={async (driver, dock) => {
           await onCallDriverToDock(driver, dock);
           setCallModalDriver(null);

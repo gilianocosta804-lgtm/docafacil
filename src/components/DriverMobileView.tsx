@@ -106,59 +106,7 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
   const [formSuccessNotice, setFormSuccessNotice] = useState<string | null>(null);
   const [showQrForms, setShowQrForms] = useState(false);
   const [copiedFormLink, setCopiedFormLink] = useState(false);
-
-  // GPS validation for Condomínio SYS do Gama, Ponte Alta
-  const BASE_LAT = -16.0492;
-  const BASE_LNG = -48.0483;
-  const BASE_NAME = 'Condomínio SYS do Gama, Ponte Alta (Gama - DF)';
-  const MAX_RADIUS_METERS = 150;
-  const [driverLat, setDriverLat] = useState<number | null>(null);
-  const [driverLng, setDriverLng] = useState<number | null>(null);
-  const [distanceMeters, setDistanceMeters] = useState<number | null>(null);
-  const [isWithinGeofence, setIsWithinGeofence] = useState<boolean>(true);
-  const [isGpsLoading, setIsGpsLoading] = useState<boolean>(false);
-  const [simulationMode, setSimulationMode] = useState<boolean>(false);
-
-  // Haversine formula
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371e3;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.round(R * c);
-  };
-
-  const detectGps = () => {
-    if (!navigator.geolocation) return;
-    setIsGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setDriverLat(latitude);
-        setDriverLng(longitude);
-        const dist = calculateDistance(latitude, longitude, BASE_LAT, BASE_LNG);
-        setDistanceMeters(dist);
-        setIsWithinGeofence(dist <= MAX_RADIUS_METERS);
-        setIsGpsLoading(false);
-      },
-      () => {
-        setIsGpsLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
-  };
-
-  useEffect(() => {
-    if (activeTab === 'forms') {
-      detectGps();
-    }
-  }, [activeTab]);
+  const [showEmbeddedForm, setShowEmbeddedForm] = useState(false);
 
   const handleSubmitCheckinFromTab = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,7 +115,7 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
     setFormSubmitting(true);
     const cleanPlaca = formPlaca.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const local = 'Pátio Condomínio SYS Gama (Ponte Alta)';
+    const local = 'Pátio da Base (Leitura QR Code)';
 
     try {
       if (onRegisterDriver) {
@@ -179,9 +127,6 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
           telefone: formTelefone.trim(),
           horarioChegada: nowTime,
           localizacao: local,
-          latitude: driverLat || BASE_LAT,
-          longitude: driverLng || BASE_LNG,
-          mapsUrl: `https://www.google.com/maps?q=${driverLat || BASE_LAT},${driverLng || BASE_LNG}`,
         });
       }
 
@@ -489,11 +434,12 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
             className={`py-2 px-1 rounded-lg text-[10px] sm:text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap leading-snug ${
               activeTab === 'forms'
                 ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                : 'text-slate-400 hover:text-white'
+                : 'text-emerald-400 hover:text-white bg-emerald-500/10 border border-emerald-500/20'
             }`}
           >
             <FileText className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Forms</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
           </button>
         </div>
       </header>
@@ -530,7 +476,7 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-bold text-white">Formulário de Chegada (Forms)</p>
-                <p className="text-[10px] text-slate-300 truncate">Check-in GPS (150m da base) & Google Forms</p>
+                <p className="text-[10px] text-slate-300 truncate">Check-in via Leitura de QR Code & Google Forms</p>
               </div>
             </div>
             <button
@@ -547,6 +493,36 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
         {/* TAB 1: MEU CARRO & STATUS */}
         {activeTab === 'meu-carro' && (
           <div className="space-y-3">
+            {/* PROMINENT ARRIVAL FORMS CARD FOR DRIVERS */}
+            {!currentDriver && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border border-emerald-500/40 shadow-xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-md shadow-emerald-500/20">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Chegada
+                      </span>
+                      <h3 className="text-xs font-bold text-white truncate">Chegou agora na Base?</h3>
+                    </div>
+                    <p className="text-[11px] text-slate-300 truncate mt-0.5">
+                      Preencha o formulário para entrar na fila de docas
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('forms')}
+                  className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shrink-0 flex items-center gap-1 shadow-md shadow-emerald-500/20 transition cursor-pointer"
+                >
+                  <span>Forms</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* CAR SELECTION CARD (IF NOT IDENTIFIED) */}
             {!currentDriver ? (
               <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/40 shadow-xl space-y-3">
@@ -653,17 +629,10 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
                       ⚡ PRIORIDADE
                     </span>
                   )}
-                  {currentDriver.mapsUrl && (
-                    <a
-                      href={currentDriver.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-sky-400 hover:text-sky-300 font-medium underline flex items-center gap-1 ml-auto"
-                    >
-                      <span>Google Maps</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+                  <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 ml-auto">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>QR Code Confirmado</span>
+                  </span>
                 </div>
               </div>
             )}
@@ -910,20 +879,10 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
                       </div>
 
                       <div className="text-right shrink-0">
-                        {driver.mapsUrl ? (
-                          <a
-                            href={driver.mapsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-[10px] font-mono border border-slate-700 inline-flex items-center gap-1 leading-none"
-                          >
-                            <MapPin className="w-3 h-3 text-sky-400 shrink-0" />
-                            <span>Mapa</span>
-                          </a>
-                        ) : (
-                          <span className="text-[10px] font-mono text-slate-500 leading-none">{driver.horarioChegada}</span>
-                        )}
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 text-[10px] font-mono border border-emerald-500/20 inline-flex items-center gap-1 leading-none font-semibold">
+                          <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span>QR Base</span>
+                        </span>
                       </div>
                     </div>
                   );
@@ -1089,15 +1048,26 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
 
               {formUrl ? (
                 <div className="space-y-2.5 pt-2 border-t border-slate-800">
-                  <a
-                    href={formUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition cursor-pointer"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>Abrir Formulário no Google Forms ↗</span>
-                  </a>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <a
+                      href={formUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition cursor-pointer"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Abrir no Google Forms ↗</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowEmbeddedForm(!showEmbeddedForm)}
+                      className="py-2.5 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>{showEmbeddedForm ? 'Fechar Formulário' : 'Preencher Nesta Tela'}</span>
+                    </button>
+                  </div>
 
                   <div className="flex items-center gap-2">
                     <button
@@ -1110,7 +1080,7 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
                       className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer"
                     >
                       {copiedFormLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedFormLink ? 'Copiado!' : 'Copiar Link'}</span>
+                      <span>{copiedFormLink ? 'Copiado!' : 'Copiar Link do Forms'}</span>
                     </button>
 
                     <button
@@ -1122,6 +1092,28 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
                       <span>{showQrForms ? 'Ocultar QR' : 'QR Code'}</span>
                     </button>
                   </div>
+
+                  {showEmbeddedForm && (
+                    <div className="rounded-xl overflow-hidden border border-emerald-500/40 bg-slate-950 shadow-2xl mt-2 animate-in fade-in duration-200">
+                      <div className="p-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-xs text-slate-300">
+                        <span className="font-semibold flex items-center gap-1.5 text-emerald-400">
+                          <FileText className="w-3.5 h-3.5" /> Formulário Google Forms Integrado
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowEmbeddedForm(false)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300"
+                        >
+                          Fechar
+                        </button>
+                      </div>
+                      <iframe
+                        src={formUrl}
+                        className="w-full h-[550px] border-0"
+                        title="Formulário Google Forms"
+                      />
+                    </div>
+                  )}
 
                   {showQrForms && (
                     <div className="p-3 bg-white rounded-xl text-center space-y-1 mx-auto max-w-[200px]">
@@ -1136,74 +1128,39 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
                 </div>
               ) : (
                 <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400">
-                  <span>Dica: Use o formulário direto abaixo para entrar na fila com localização GPS automática.</span>
+                  <span>Dica: Use o formulário direto abaixo para entrar na fila com validação via QR Code da base.</span>
                 </div>
               )}
             </div>
 
-            {/* OPTION 2: CHECK-IN DIRETO NO CELULAR COM VALIDAÇÃO GPS (150M) */}
+            {/* OPTION 2: CHECK-IN DIRETO NO CELULAR POR LEITURA DE QR CODE */}
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
               <div>
                 <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                  Check-in Inteligente no Celular
+                  Check-in por QR Code da Base
                 </span>
                 <h3 className="text-sm font-bold text-white mt-1.5">
-                  Preenchimento Direto no App
+                  Preenchimento Direto no Celular
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Base: <strong className="text-slate-200">Condomínio SYS do Gama, Ponte Alta</strong> (Raio máximo de 150m)
+                  Chegada presencial no pátio da base confirmada por leitura de QR Code
                 </p>
               </div>
 
-              {/* GPS Geofence Status */}
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+              {/* QR Code Arrival Confirmation Banner */}
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-emerald-400" />
-                    <span className="text-slate-300 font-medium">Localização GPS:</span>
+                  <div className="flex items-center gap-1.5 text-emerald-300 font-bold">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <span>Chegada Validada via QR Code</span>
                   </div>
-                  {isGpsLoading ? (
-                    <span className="text-[11px] text-amber-400 flex items-center gap-1 font-mono">
-                      <RefreshCw className="w-3 h-3 animate-spin" />
-                      Calculando...
-                    </span>
-                  ) : distanceMeters !== null ? (
-                    <span
-                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${
-                        isWithinGeofence || simulationMode
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      }`}
-                    >
-                      {distanceMeters}m da Base
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={detectGps}
-                      className="text-[11px] text-sky-400 underline cursor-pointer"
-                    >
-                      Detectar GPS
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[10px]">
-                  <span className="text-slate-400">
-                    {simulationMode
-                      ? 'Simulação ativa (Dentro da base - 150m)'
-                      : isWithinGeofence
-                      ? '✅ Você está dentro do raio permitido (150m)'
-                      : '⚠️ Limite é 150m do Condomínio SYS do Gama'}
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                    Portaria da Base
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setSimulationMode(!simulationMode)}
-                    className="text-amber-400 hover:underline font-mono cursor-pointer shrink-0"
-                  >
-                    {simulationMode ? 'Desativar Teste' : 'Modo Teste'}
-                  </button>
                 </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Sem necessidade de GPS. Preencha seus dados abaixo para entrar na fila de carregamento das docas.
+                </p>
               </div>
 
               {/* Form Input Fields */}
@@ -1286,7 +1243,7 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
 
                 <button
                   type="submit"
-                  disabled={formSubmitting || (!isWithinGeofence && !simulationMode)}
+                  disabled={formSubmitting}
                   className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
                 >
                   <Send className="w-4 h-4" />
@@ -1301,8 +1258,8 @@ export const DriverMobileView: React.FC<DriverMobileViewProps> = ({
               onClick={onGoToCheckin}
               className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
             >
-              <Navigation className="w-4 h-4 text-emerald-400" />
-              <span>Abrir Modo Check-in com Radar em Tela Cheia</span>
+              <QrCode className="w-4 h-4 text-emerald-400" />
+              <span>Abrir QR Code de Chegada na Portaria (Tela Cheia)</span>
             </button>
           </div>
         )}

@@ -140,8 +140,8 @@ export class GoogleFormsService {
         {
           createItem: {
             item: {
-              title: 'Localização do Check-in na Base (Google Maps / Pátio)',
-              description: 'Onde seu carro está estacionado na base (Ex: Pátio A - Vaga 12, Pátio Central ou coordenadas/link do Google Maps)',
+              title: 'Localização de Chegada na Base (Leitura QR Code)',
+              description: 'Confirmação presencial no pátio da base por leitura de QR Code da guarita/portaria',
               questionItem: {
                 question: {
                   required: true,

@@ -33,7 +33,7 @@ export const ManualRegistrationModal: React.FC<ManualRegistrationModalProps> = (
   const [horarioChegada, setHorarioChegada] = useState(
     new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   );
-  const [localizacao, setLocalizacao] = useState('Pátio Condomínio SYS Gama (Ponte Alta)');
+  const [localizacao, setLocalizacao] = useState('Pátio da Base (QR Code)');
   const [placa, setPlaca] = useState('');
   const [telefone, setTelefone] = useState('');
 
@@ -49,10 +49,7 @@ export const ManualRegistrationModal: React.FC<ManualRegistrationModalProps> = (
       cidade: cidade.trim(),
       rotaPrioridade,
       horarioChegada: horarioChegada || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      localizacao: localizacao.trim(),
-      latitude: -16.0492,
-      longitude: -48.0483,
-      mapsUrl: 'https://www.google.com/maps?q=-16.0492,-48.0483',
+      localizacao: localizacao.trim() || 'Pátio da Base (QR Code)',
       placa: placa.trim().toUpperCase(),
       telefone: telefone.trim(),
     });

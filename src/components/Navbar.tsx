@@ -152,13 +152,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onViewChange('driver-checkin')}
             className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap leading-none ${
               currentView === 'driver-checkin'
-                ? 'bg-amber-500 text-slate-950 shadow-sm'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                : 'text-emerald-400 hover:text-white bg-emerald-500/10'
             }`}
-            title="Check-in Automático de Chegada"
+            title="Formulário de Chegada e Check-in dos Motoristas"
           >
             <ClipboardList className="w-4 h-4 shrink-0" />
-            <span className="hidden md:inline">Check-in</span>
+            <span className="hidden sm:inline">Forms / Chegada</span>
+            <span className="inline sm:hidden">Forms</span>
           </button>
         </nav>
 

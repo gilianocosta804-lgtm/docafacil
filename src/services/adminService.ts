@@ -75,9 +75,11 @@ const INITIAL_AUTHORIZED_USERS: AuthorizedUser[] = [
     username: 'operador',
     password: generateMergedPassword('Carlos', '234.567.890-11', '11976543210'),
     role: 'operador',
+    assignedDockId: 'dock-1',
+    assignedDockNome: 'Doca 01',
     status: 'ativo',
     createdAt: new Date().toLocaleDateString('pt-BR'),
-    notes: 'Operador de docas e chamada de carros',
+    notes: 'Operador de docas e chamada de carros (Doca 01)',
   },
 ];
 
